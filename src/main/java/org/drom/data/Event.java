@@ -11,6 +11,8 @@ import java.time.format.DateTimeFormatter;
 @NoArgsConstructor
 @AllArgsConstructor
 public class Event {
+    private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
+    
     private String id;                 // Unique identifier (UUID or hash)
     private String name;               // Event title
     private String description;        // Short summary
@@ -28,9 +30,7 @@ public class Event {
     }
 
     private LocalDateTime parseDate(String date) {
-        // Adjust format to match your input, e.g. "2025-09-14T18:30"
-        DateTimeFormatter formatter = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
-        return LocalDateTime.parse(date, formatter);
+        return LocalDateTime.parse(date, DATE_FORMATTER);
     }
 
 }
