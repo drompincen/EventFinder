@@ -1,0 +1,401 @@
+================================================================================
+                    SWAGGER (OpenAPI) SETUP GUIDE
+                    For Event Finder Application
+================================================================================
+
+Swagger is a tool that automatically creates interactive API documentation.
+It lets you test your API endpoints directly from a web browser - no curl needed!
+
+================================================================================
+STEP 1: Add Swagger Dependency to pom.xml
+================================================================================
+
+Add this dependency inside the <dependencies> section of pom.xml:
+
+    <!-- Swagger / OpenAPI 3 Documentation -->
+    <dependency>
+      <groupId>org.springdoc</groupId>
+      <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+      <version>2.2.0</version>
+    </dependency>
+
+This library (springdoc-openapi) works with Spring Boot 3.x and provides:
+  - Automatic API documentation generation
+  - Swagger UI (interactive web interface)
+  - OpenAPI 3.0 spec generation
+
+================================================================================
+STEP 2: Create Swagger Configuration Class
+================================================================================
+
+Create a new file: src/main/java/org/drom/config/SwaggerConfig.java
+
+--------------------------------------------------------------------------------
+package org.drom.config;
+
+import io.swagger.v3.oas.models.OpenAPI;
+import io.swagger.v3.oas.models.info.Contact;
+import io.swagger.v3.oas.models.info.Info;
+import io.swagger.v3.oas.models.info.License;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+/**
+ * SWAGGER CONFIGURATION
+ * 
+ * This class customizes the Swagger/OpenAPI documentation page.
+ * Without this, you'd still get Swagger, but with default/generic info.
+ */
+@Configuration
+public class SwaggerConfig {
+
+    @Bean
+    public OpenAPI eventFinderOpenAPI() {
+        return new OpenAPI()
+                .info(new Info()
+                        .title("Event Finder API")
+                        .description("REST API for discovering and managing local events by zip code. " +
+                                     "Use this API to find events, create new events, and manage your event database.")
+                        .version("1.0.0")
+                        .contact(new Contact()
+                                .name("Event Finder Team")
+                                .email("support@eventfinder.com"))
+                        .license(new License()
+                                .name("MIT License")
+                                .url("https://opensource.org/licenses/MIT")));
+    }
+}
+--------------------------------------------------------------------------------
+
+================================================================================
+STEP 3: Add POST Endpoint to Save Events
+================================================================================
+
+Update EventController.java to add the POST endpoint for saving events.
+
+Add these imports at the top:
+--------------------------------------------------------------------------------
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import java.util.UUID;
+--------------------------------------------------------------------------------
+
+Add the @Tag annotation to the class (right after @RequestMapping):
+--------------------------------------------------------------------------------
+@Tag(name = "Events", description = "Event management APIs - find, create, and manage local events")
+--------------------------------------------------------------------------------
+
+Update the existing GET endpoint with Swagger annotations:
+--------------------------------------------------------------------------------
+@Operation(
+    summary = "Find events by zip code",
+    description = "Returns a list of events in the specified zip code. If no events exist, returns mock/generated events."
+)
+@ApiResponses(value = {
+    @ApiResponse(responseCode = "200", description = "Successfully retrieved events",
+                 content = @Content(mediaType = "application/json", 
+                                    schema = @Schema(implementation = Event.class))),
+    @ApiResponse(responseCode = "400", description = "Invalid zip code format")
+})
+@GetMapping
+public List<Event> getEventsByZip(
+        @Parameter(description = "5-digit US zip code", example = "84098", required = true)
+        @RequestParam @Pattern(regexp = "\\d{5}") String zip) {
+    return eventFinder.findEventsByZipCode(zip);
+}
+--------------------------------------------------------------------------------
+
+Add the new POST endpoint:
+--------------------------------------------------------------------------------
+@Operation(
+    summary = "Create a new event",
+    description = "Saves a new event to the database. If no ID is provided, one will be generated automatically."
+)
+@ApiResponses(value = {
+    @ApiResponse(responseCode = "200", description = "Event created successfully",
+                 content = @Content(mediaType = "application/json", 
+                                    schema = @Schema(implementation = Event.class))),
+    @ApiResponse(responseCode = "400", description = "Invalid event data")
+})
+@PostMapping
+public Event createEvent(
+        @io.swagger.v3.oas.annotations.parameters.RequestBody(
+            description = "Event to create",
+            required = true,
+            content = @Content(schema = @Schema(implementation = Event.class)))
+        @RequestBody Event event) {
+    
+    // Generate a unique ID if not provided
+    if (event.getId() == null || event.getId().isEmpty()) {
+        event.setId(UUID.randomUUID().toString());
+    }
+    
+    eventFinder.saveEvent(event);
+    return event;
+}
+--------------------------------------------------------------------------------
+
+================================================================================
+STEP 4: Add Swagger Annotations to Event Model
+================================================================================
+
+Update Event.java to add schema descriptions for better documentation.
+
+Add this import:
+--------------------------------------------------------------------------------
+import io.swagger.v3.oas.annotations.media.Schema;
+--------------------------------------------------------------------------------
+
+Add @Schema annotations to the class and fields:
+--------------------------------------------------------------------------------
+@Schema(description = "Represents a local event")
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class Event {
+    
+    @Schema(description = "Unique identifier (UUID)", example = "550e8400-e29b-41d4-a716-446655440000")
+    private String id;
+    
+    @Schema(description = "Event name/title", example = "Summer Music Festival", required = true)
+    private String name;
+    
+    @Schema(description = "Short description of the event", example = "Live music, food trucks, and fun!")
+    private String description;
+    
+    @Schema(description = "Date and time of the event", example = "2025-07-15T19:00:00")
+    private LocalDateTime dateTime;
+    
+    @Schema(description = "Venue or address", example = "Central Park, Main Stage")
+    private String location;
+    
+    @Schema(description = "5-digit zip code", example = "84098", required = true)
+    private String zipCode;
+    
+    @Schema(description = "Event category", example = "Concert")
+    private String category;
+    
+    @Schema(description = "URL for more info or tickets", example = "https://example.com/event")
+    private String sourceUrl;
+    
+    // ... rest of the class stays the same
+}
+--------------------------------------------------------------------------------
+
+================================================================================
+STEP 5: Configure Application Properties (Optional)
+================================================================================
+
+Create or update src/main/resources/application.properties:
+
+--------------------------------------------------------------------------------
+# Server Configuration
+server.port=8080
+
+# Swagger/OpenAPI Configuration
+springdoc.api-docs.path=/api-docs
+springdoc.swagger-ui.path=/swagger-ui.html
+springdoc.swagger-ui.operationsSorter=method
+springdoc.swagger-ui.tagsSorter=alpha
+
+# Show Swagger UI link on startup
+springdoc.swagger-ui.enabled=true
+--------------------------------------------------------------------------------
+
+================================================================================
+STEP 6: Print Swagger Link on Startup
+================================================================================
+
+Create a new file: src/main/java/org/drom/config/StartupLogger.java
+
+--------------------------------------------------------------------------------
+package org.drom.config;
+
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
+import org.springframework.stereotype.Component;
+
+/**
+ * Prints helpful links when the application starts up.
+ */
+@Component
+public class StartupLogger {
+
+    @EventListener(ApplicationReadyEvent.class)
+    public void onApplicationReady() {
+        System.out.println();
+        System.out.println("================================================================================");
+        System.out.println("   EVENT FINDER APPLICATION STARTED SUCCESSFULLY!");
+        System.out.println("================================================================================");
+        System.out.println();
+        System.out.println("   Swagger UI (Interactive API Docs):");
+        System.out.println("   → http://localhost:8080/swagger-ui.html");
+        System.out.println();
+        System.out.println("   OpenAPI JSON Spec:");
+        System.out.println("   → http://localhost:8080/api-docs");
+        System.out.println();
+        System.out.println("   API Endpoints:");
+        System.out.println("   → GET  http://localhost:8080/events?zip=84098");
+        System.out.println("   → POST http://localhost:8080/events");
+        System.out.println();
+        System.out.println("================================================================================");
+        System.out.println();
+    }
+}
+--------------------------------------------------------------------------------
+
+================================================================================
+STEP 7: Build and Run
+================================================================================
+
+1. Rebuild the project:
+   mvn clean compile
+
+2. Run the application (with local DynamoDB profile):
+   mvn spring-boot:run -Dspring-boot.run.profiles=local
+
+3. Open your browser and go to:
+   http://localhost:8080/swagger-ui.html
+
+================================================================================
+USING SWAGGER UI
+================================================================================
+
+Once Swagger UI is open, you can:
+
+1. VIEW ALL ENDPOINTS
+   - See all available API endpoints organized by tags
+   - Read descriptions and parameter info
+
+2. TEST GET /events
+   - Click on "GET /events"
+   - Click "Try it out"
+   - Enter a zip code (e.g., "84098")
+   - Click "Execute"
+   - See the response below!
+
+3. TEST POST /events (Create an event)
+   - Click on "POST /events"
+   - Click "Try it out"
+   - Edit the JSON body:
+     {
+       "name": "My Test Event",
+       "location": "Test Location",
+       "zipCode": "84098",
+       "dateTime": "2025-08-15T18:00:00",
+       "category": "Test",
+       "description": "This is a test event created via Swagger!"
+     }
+   - Click "Execute"
+   - The event is now saved!
+
+4. VERIFY THE EVENT WAS SAVED
+   - Go back to "GET /events"
+   - Search for zip code "84098"
+   - You should see your newly created event!
+
+================================================================================
+COMPLETE UPDATED EventController.java
+================================================================================
+
+Here's the complete updated controller for reference:
+
+--------------------------------------------------------------------------------
+package org.drom.controller;
+
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.constraints.Pattern;
+import org.drom.data.Event;
+import org.drom.service.EventFinder;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+import java.util.UUID;
+
+@RestController
+@RequestMapping("/events")
+@Tag(name = "Events", description = "Event management APIs - find, create, and manage local events")
+public class EventController {
+
+    private final EventFinder eventFinder;
+
+    @Autowired
+    public EventController(EventFinder eventFinder) {
+        this.eventFinder = eventFinder;
+    }
+
+    @Operation(
+        summary = "Find events by zip code",
+        description = "Returns a list of events in the specified zip code. If no events exist, returns mock/generated events."
+    )
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Successfully retrieved events",
+                     content = @Content(mediaType = "application/json", 
+                                        schema = @Schema(implementation = Event.class))),
+        @ApiResponse(responseCode = "400", description = "Invalid zip code format")
+    })
+    @GetMapping
+    public List<Event> getEventsByZip(
+            @Parameter(description = "5-digit US zip code", example = "84098", required = true)
+            @RequestParam @Pattern(regexp = "\\d{5}") String zip) {
+        return eventFinder.findEventsByZipCode(zip);
+    }
+
+    @Operation(
+        summary = "Create a new event",
+        description = "Saves a new event to the database. If no ID is provided, one will be generated automatically."
+    )
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Event created successfully",
+                     content = @Content(mediaType = "application/json", 
+                                        schema = @Schema(implementation = Event.class))),
+        @ApiResponse(responseCode = "400", description = "Invalid event data")
+    })
+    @PostMapping
+    public Event createEvent(
+            @io.swagger.v3.oas.annotations.parameters.RequestBody(
+                description = "Event to create",
+                required = true,
+                content = @Content(schema = @Schema(implementation = Event.class)))
+            @RequestBody Event event) {
+        
+        if (event.getId() == null || event.getId().isEmpty()) {
+            event.setId(UUID.randomUUID().toString());
+        }
+        
+        eventFinder.saveEvent(event);
+        return event;
+    }
+}
+--------------------------------------------------------------------------------
+
+================================================================================
+TROUBLESHOOTING
+================================================================================
+
+Problem: Swagger UI shows 404
+Solution: Make sure the dependency is correct and run `mvn clean compile`
+
+Problem: Can't save events (DynamoDB error)
+Solution: Make sure DynamoDB Local is running:
+          docker start dynamodb-local
+
+Problem: Events not showing after save
+Solution: Make sure you're using the same zip code for GET and POST
+
+Problem: "Whitelabel Error Page"
+Solution: Check the console for errors. Usually a configuration issue.
+
+================================================================================
