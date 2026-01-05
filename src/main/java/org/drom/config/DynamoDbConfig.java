@@ -14,4 +14,5 @@ public class DynamoDbConfig {
                 .region(Region.US_WEST_2) // Replace with your actual region
                 .build();
     }
+    ///
 }
