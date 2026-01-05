@@ -257,6 +257,7 @@ curl -X POST http://localhost:8080/events \
     "zipCode": "84098",
     "dateTime": "2025-07-15T19:00:00",
     "category": "Concert"
+    
   }'
 ```
 
